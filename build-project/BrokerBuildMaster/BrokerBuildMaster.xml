@@ -1,0 +1,270 @@
+<?xml version="1.0"?>
+<!-- ####### BrokeruildMaster.xml ####### -->
+<!-- Description: -->
+<!-- 	This is the Broker master ant file which does the following steps: -->
+<!-- 		1. Cleans the toolkit workspace before starting to importin the respurces -->
+<!--		2. Imports the broker source project code from SCM (Subverion in this case) -->
+<!--        3. Creates the Broker Archive(BAR) file(s) throught executing MQSI toolkit command mqsicreatebar -->
+<!--        4. Apply overrides specific to the environment on to thr BAR file(s) throught executing MQSI toolkit command mqsibaroveride -->
+<!--        5. Ftps the generated BAR file(s) to the Broker server usin SSH -->
+<!--        6. Deploys them to the broker environment remotely throught executing MQSI runtime command mqsideploybar -->
+<!--		7. Reports the deploy information on the concole through executing MQSI runtime command mqsireportbar -->
+<!-- 		8. Creats a snaphshot of the build code as tagging or branching -->
+<!-- Change History: -->
+<!--	1.0.0.0		08/27/2013		Intial version -->
+
+<project name="Broker.Build.Automation" default="master.build.deploy">
+	<target name="master.build.deploy" description="This parent ant target executes the build, override and deploy ant targets.">
+
+		<path id= "svnant.classpath" >
+			<fileset dir= "${env.WORKSPACE}/AntLibraryFiles/lib" >
+			     <include name= "*.jar" />
+			</fileset>
+		</path>
+		
+		<taskdef resource="net/sf/antcontrib/antcontrib.properties" classpathref="svnant.classpath"/>
+		<typedef resource="org/tigris/subversion/svnant/svnantlib.xml" classpathref="svnant.classpath"/>
+				
+		<property name="toolkit.home" value="/opt/app/IBM/WMBT700" />
+    	<property name="user.home" value="/export/home/jboss" />
+		<property name="broker.build.home" value="/opt/app/jboss/WMB_Build" />
+		
+		<property name="toolkit.workspace" value="${broker.build.home}/workspace" />
+		<property name="ant.bars.basedir" value="${broker.build.home}/${build.team}"/>
+		
+		<property name="broker.env.file" value="${env.PROJECT}_Broker_${env.ENV}.env" />
+		<property name="comp.full.name" value="${env.PROJECT}_${build.team}" />
+		<property file="${build.property.file}"/>
+		<property file="${env.WORKSPACE}/BrokerBuildMaster/broker_env/${broker.env.file}"/>		
+		
+		<!-- No of the Execution Groups are dynamically calucalated based on the parameters given in the property file. -->
+  		<resourcecount property="total.exec.group">
+    			<tokens>
+      				<concat>
+        				<filterchain>
+          					<tokenfilter>
+            						<containsregex pattern="exec_grp.*.msg.flows" flags="i"/>
+          					</tokenfilter>
+        				</filterchain>
+        				<fileset file="${build.property.file}"/>
+      				</concat>
+    			</tokens>
+  		</resourcecount>
+		<!--
+		<exec executable="seq" outputproperty="numberOfExecGrps">
+    			<arg value="${total.exec.group}"/>
+      	</exec>
+		-->
+		<property name="numberOfExecGrps" value="1,2" />
+		
+		<for list="${numberOfExecGrps}" param="var-exec-grp-num" delimiter=",">
+			<sequential>
+				<property name="exec_grp@{var-exec-grp-num}.bar.file.name" value="${comp.full.name}_${env.BUILD_ID}_${env.BUILD_NUMBER}_${EXEC_GRP@{var-exec-grp-num}}.bar"/>
+				<property name="exec_grp@{var-exec-grp-num}.bar.file.path" value="${ant.bars.basedir}/generated_bars/${env.ENV}/${exec_grp@{var-exec-grp-num}.bar.file.name}"/>
+				<property name="exec_grp@{var-exec-grp-num}.property.file" value="${env.WORKSPACE}/${broker.build.main.project}/build/property_files/${comp.full.name}_BarOverride_${env.ENV}_${EXEC_GRP@{var-exec-grp-num}}.properties"/>
+				
+				<echo message="${comp.full.name}_${env.BUILD_ID}_${env.BUILD_NUMBER}_${EXEC_GRP@{var-exec-grp-num}}.bar"/>
+				<echo message="${ant.bars.basedir}/generated_bars/${env.ENV}/${exec_grp@{var-exec-grp-num}.bar.file.name}"/>
+				<echo message="${env.WORKSPACE}/${broker.build.main.project}/build/property_files/${comp.full.name}_BarOverride_${env.ENV}_${EXEC_GRP@{var-exec-grp-num}}.properties"/>
+			</sequential>
+		</for>
+		<antcall target="invoke.module.targets"/>
+	</target>
+	
+	<!-- Invoke respective Ant Targets based on the parameters from Hudson -->
+	<target name="invoke.module.targets" description="This ant target removes the existing project files from the btoker toookit workplace.">
+		<echo message="Invoking build and deploy modules..."/>
+		<if>
+		<equals arg1="${env.BUILD}" arg2="true" />
+		<then>
+		 	<echo message="Broker toolkit workspace is set to ${toolkit.workspace}."/>	     		
+     		<antcall target="remove.existing.projects"/>
+			
+			<if>
+				<or>
+					<equals arg1="${env.BUILD_FROM}" arg2="BRANCH" />
+		            <equals arg1="${env.BUILD_FROM}" arg2="TAG" />	
+				</or>
+				<then>
+					<property name="source.location" value="last-successful/${env.BUILD_LOCATION}"/>
+		 		</then>
+			<else>
+				<property name="source.location" value="trunk"/>
+			</else>
+			</if>
+			<!--
+			<antcall target="import.broker.projects"/>
+			-->
+	 		<antcall target="mqsicreatebar.buildbar"/>
+			<antcall target="mqsiapplybaroverride.modifybar"/>
+		 </then>
+		</if>
+		
+		<if>
+		 <equals arg1="${env.DEPLOY}" arg2="true" />
+		 <then>
+		   <antcall target="sftp.bar.to.broker.server"/>
+		   <antcall target="mqsideploy.deploybar"/>
+		   <antcall target="mqsilist.reportdeploy"/>
+		 </then>
+		</if>
+		<if>
+		 <equals arg1="${env.BUILD}" arg2="true" />
+		 <then>
+		   <antcall target="remove.existing.projects"/>
+		 </then>
+		</if>
+		<if>
+			<equals arg1="${env.SNAPSHOT}" arg2="true" />
+			<then>
+			<if>
+		 		<equals arg1="${env.SNAPSHOT_TYPE}" arg2="TAG" />
+		 		<then>
+		 			<property name="snapshot.location" value="tags"/>
+		 			<property name="snapshot.type.ing" value="Tagging"/>
+				</then>	
+			<else>
+				<property name="snapshot.location" value="branches"/>
+				<property name="snapshot.type.ing" value="Branching"/>
+			</else>
+			</if>
+			<antcall target="subversion.tagging.branching"/>	
+			</then>	
+		</if> 
+	</target>
+
+	<target name="remove.existing.projects" description="This ant target removes the existing project files from the btoker toookit workplace.">
+		<echo message="Removing existing project files from broker toolkit workspace..."/>
+		<for list="${broker.build.projects}" param="var-broker-prj">
+		<sequential>
+			<delete dir="${toolkit.workspace}/@{var-broker-prj}"/>
+		</sequential>
+		</for>
+		<echo message="Completed removing existing project files from broker toolkit workspace."/>
+	</target>
+
+	<target name="import.broker.projects" description="This ant target copies broker projects files from Subversion to broker toolkit workspace.">
+		<echo message="Importing broker project files from Subversion to broker toolkit workspace..." />
+		<for list="${broker.build.projects}" param="var-broker-prj">
+		<sequential>
+			<svn javahl="false" svnkit="true" username="${svn.username}" password="${svn.password}">
+				<checkout url="${svn.url}/@{var-broker-prj}/${source.location}" destPath="${toolkit.workspace}/@{var-broker-prj}" force="true" depth="infinity" ignoreexternals="true"/>
+			</svn>
+		</sequential>
+		</for>
+		<echo message="Completed importing broker project files from Subverion to broker tookit workspace."/>
+	</target>  
+
+	<target name="mqsicreatebar.buildbar" description="This ant target creates the BAR files using mqsicreatebar with referencing all required projects.">	
+		<propertyregex property="argln_broker_prj" input="${broker.build.projects}" regexp="\," replace=" " global="true"  defaultValue="${broker.build.projects}"/>
+		<if>
+				<equals arg1="${env.ADD_VERSION_IN_MSGFLOWS}" arg2="true" />
+				<then>
+			   		<property name="version" value="-version"/>
+					<property name="version.number" value="${env.VERSION_NUM}"/>
+			 	</then>
+				<else>
+			   		<property name="version" value=""/>
+					<property name="version.number" value=""/>	
+				</else>
+		</if>
+		<for list="${numberOfExecGrps}" param="var-exec-grp-num" delimiter=",">
+			<sequential>
+				<echo message="Creating broker archive(BAR) file ${exec_grp@{var-exec-grp-num}.bar.file.name} ..." />
+				<propertyregex property="argln_eg@{var-exec-grp-num}_msgflow" input="${exec_grp@{var-exec-grp-num}.msg.flows}" regexp="\," replace=" " global="true" defaultvalue="${exec_grp@{var-exec-grp-num}.msg.flows}"/>
+				<propertyregex property="argln_eg@{var-exec-grp-num}_msgset" input="${exec_grp@{var-exec-grp-num}.msg.sets}" regexp="\," replace=" " global="true" defaultValue="${exec_grp@{var-exec-grp-num}.msg.sets}"/>
+				<echo message="${toolkit.home}/mqsicreatebar -cleanbuild -data ${toolkit.workspace} -b ${exec_grp@{var-exec-grp-num}.bar.file.path} ${version} ${version.number} -p ${argln_broker_prj} -o ${argln_eg@{var-exec-grp-num}_msgflow} ${argln_eg@{var-exec-grp-num}_msgset}"/>
+				
+				<exec executable="${toolkit.home}/mqsicreatebar" spawn="false" failonerror="true" vmlauncher="false">	
+					<arg value="-cleanbuild"/>
+      				<arg value="-data"/>
+      				<arg value="${toolkit.workspace}"/>
+      				<arg value="-b" />
+      				<arg value="${exec_grp@{var-exec-grp-num}.bar.file.path}" />
+      				<arg value="${version}"/>
+      				<arg value="${version.number}"/>
+      				<arg value="-p" />
+					<arg line="${argln_broker_prj}"/>
+      				<arg value="-o"/>
+      				<arg line="${argln_eg@{var-exec-grp-num}_msgflow}"/>
+					<arg line="${argln_eg@{var-exec-grp-num}_msgset}"/>
+    			</exec>
+    				<echo message="Completed creating broker archive(BAR) file ${exec_grp@{var-exec-grp-num}.bar.file.name}." />
+			</sequential>
+		</for>	
+	</target>
+
+	<target name="mqsiapplybaroverride.modifybar" description="This ant target applies overrides to the generated bar file from properties file.">
+		<for list="${numberOfExecGrps}" param="var-exec-grp-num" delimiter="${line.separator}">
+			<sequential>
+				<echo message="Applying environment specific overrides on broker archive(BAR) file ${exec_grp@{var-exec-grp-num}.bar.file.name} from property file ${exec_grp@{var-exec-grp-num}.property.file}... " />
+	    			<echo message="${toolkit.home}/mqsiapplybaroverride -b ${exec_grp@{var-exec-grp-num}.bar.file.path} -p ${exec_grp@{var-exec-grp-num}.property.file}" />
+	    			<exec executable="${toolkit.home}/mqsiapplybaroverride" spawn="false" failonerror="true">
+	    				<arg value="-b" />
+	      				<arg value="${exec_grp@{var-exec-grp-num}.bar.file.path}" />
+	      				<arg value="-p" />
+	      				<arg value="${exec_grp@{var-exec-grp-num}.property.file}" />
+	    			</exec>
+	    			<echo message="Completed applying overrides in broker archive(BAR) file ${exec_grp@{var-exec-grp-num}.bar.file.name}." />
+			</sequential>
+		</for>
+	</target>
+
+	<target name="sftp.bar.to.broker.server" description="This ant target ftps the BAR file to remote Broker server.">
+		<for list="${numberOfExecGrps}" param="var-exec-grp-num" delimiter="${line.separator}">
+				<sequential>
+					<echo message="Ftping broker archive(BAR) file ${exec_grp@{var-exec-grp-num}.bar.file.name} to remote broker server ${HOST} at path ${REMOTE_PATH}..." />
+					<scp file="${exec_grp@{var-exec-grp-num}.bar.file.path}" todir="${USER}@${HOST}:${REMOTE_PATH}" keyfile="${user.home}/.ssh/id_rsa" failonerror="true"/>
+					<echo message="The broker archive(BAR) file ${exec_grp@{var-exec-grp-num}.bar.file.name} is sucessfully ftped to remote broker server ${HOST}."/>
+				</sequential>
+		</for>
+	</target>	
+
+	<target name="mqsideploy.deploybar" description="This ant target deploys the BAR file to the broker remotely.">
+		<if>
+			<equals arg1="${env.DEPLOY_MODE}" arg2="INCREMENTAL" />
+			<then>
+		   		<property name="deploy.mode" value=""/>
+		 	</then>
+		 	<elseif>
+		  	<equals arg1="${env.DEPLOY_MODE}" arg2="FULL" />
+		  	<then>
+		  		<property name="deploy.mode" value="-m"/>
+		  	</then>
+		 	</elseif>
+		 <else>
+		 		<property name="deploy.option" value="-m"/>
+		 </else>
+		</if>
+		<for list="${numberOfExecGrps}" param="var-exec-grp-num" delimiter="${line.separator}">
+			<sequential>
+				<echo message="Deploying broker archive(BAR) file ${exec_grp@{var-exec-grp-num}.bar.file.name} to ${EXEC_GRP@{var-exec-grp-num}} at remote broker ${BROKER} locally..." />
+				<sshexec host="${HOST}" username="${USER}" keyfile="${user.home}/.ssh/id_rsa" command=". ~/.bash_profile; ${MQSI_HOME}/mqsideploy ${BROKER} -e ${EXEC_GRP@{var-exec-grp-num}} -a ${REMOTE_PATH}/${exec_grp@{var-exec-grp-num}.bar.file.name} ${deploy.mode} -w 600" failonerror="true"/>
+				<sshexec host="${HOST}" username="${USER}" keyfile="${user.home}/.ssh/id_rsa" command="rm ${REMOTE_PATH}/${exec_grp@{var-exec-grp-num}.bar.file.name}"/>
+				<echo message="The broker archive(BAR) file ${exec_grp@{var-exec-grp-num}.bar.file.name} is successfully deployed to execution group ${EXEC_GRP@{var-exec-grp-num}} in Broker ${BROKER}."/>
+			</sequential>
+		</for>
+	</target>
+
+	<target name="mqsilist.reportdeploy" description="This ant target reports the deployed resources for verifying the broker deploy.">
+		<for list="${numberOfExecGrps}" param="var-exec-grp-num" delimiter="${line.separator}">
+			<sequential>
+				<echo message="Reporting the deployed resources for verifying the broker deploy on execution group ${EXEC_GRP@{var-exec-grp-num}} in broker ${BROKER}..."/>
+				<sshexec host="${HOST}" username="${USER}" keyfile="${user.home}/.ssh/id_rsa" command=". ~/.bash_profile; ${MQSI_HOME}/mqsilist ${BROKER} -e ${EXEC_GRP@{var-exec-grp-num}} -r -d2 -w 600| egrep -wi 'Deployed|Message flow|Additional thread instances|File'"/>
+				<echo message="Reported the deployed resources on execution group ${EXEC_GRP@{var-exec-grp-num}} in broker ${BROKER}..."/>
+			</sequential>
+		</for>
+	</target>
+
+	<target name="subversion.tagging.branching" description="This target connects to svn and creates the snapshot(tag/branch) from the build code to the respective project.">
+	       	<echo message="${snapshot.type.ing} all source projects in Subversion..."/>
+				<for list="${broker.build.projects}" param="var-broker-prj">
+				<sequential>
+					<svn javahl="false" svnkit="true" username="${svn.username}" password="${svn.password}">
+						<copy srcUrl="${svn.url}/@{var-broker-prj}/${source.location}" destUrl="${svn.url}/@{var-broker-prj}/${snapshot.location}/last-successful/${env.SNAPSHOT_NAME}" message="Tagging Project @{var-broker-prj} with tag name ${env.SNAPSHOT_NAME} from ${source.location}."/>
+					</svn>	
+				</sequential>
+				</for>
+	       	<echo message="Completed ${snapshot.type.ing} all source projects in Subversion with name ${env.SNAPSHOT_NAME}."/>
+	</target>
+</project>

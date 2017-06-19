@@ -1,0 +1,149 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<project>
+  <actions/>
+  <description>This Hudson Job creates Broker Archive file and applies environment specific overrides to the Bar and Deploys to the remote server.</description>
+  <logRotator>
+    <daysToKeep>-1</daysToKeep>
+    <numToKeep>12</numToKeep>
+    <artifactDaysToKeep>-1</artifactDaysToKeep>
+    <artifactNumToKeep>-1</artifactNumToKeep>
+  </logRotator>
+  <keepDependencies>false</keepDependencies>
+  <properties>
+    <hudson.model.ParametersDefinitionProperty>
+      <parameterDefinitions>
+        <hudson.model.ChoiceParameterDefinition>
+          <name>PROJECT</name>
+          <description></description>
+          <choices class="java.util.Arrays$ArrayList">
+            <a class="string-array">
+              <string>PRJ1</string>
+              <string>PRJ2</string>
+            </a>
+          </choices>
+        </hudson.model.ChoiceParameterDefinition>
+        <hudson.model.ChoiceParameterDefinition>
+          <name>ENV</name>
+          <description></description>
+          <choices class="java.util.Arrays$ArrayList">
+            <a class="string-array">
+              <string>DEV</string>
+              <string>TEST</string>
+              <string>PROD</string>
+            </a>
+          </choices>
+        </hudson.model.ChoiceParameterDefinition>
+        <hudson.model.BooleanParameterDefinition>
+          <name>BUILD</name>
+          <description></description>
+          <defaultValue>false</defaultValue>
+        </hudson.model.BooleanParameterDefinition>
+        <hudson.model.ChoiceParameterDefinition>
+          <name>BUILD_FROM</name>
+          <description></description>
+          <choices class="java.util.Arrays$ArrayList">
+            <a class="string-array">
+              <string>TRUNK</string>
+              <string>BRANCH</string>
+              <string>TAG</string>
+            </a>
+          </choices>
+        </hudson.model.ChoiceParameterDefinition>
+        <hudson.model.StringParameterDefinition>
+          <name>BUILD_LOCATION</name>
+          <description></description>
+          <defaultValue>trunk</defaultValue>
+        </hudson.model.StringParameterDefinition>
+        <hudson.model.BooleanParameterDefinition>
+          <name>ADD_VERSION_IN_MSGFLOWS</name>
+          <description></description>
+          <defaultValue>false</defaultValue>
+        </hudson.model.BooleanParameterDefinition>
+        <hudson.model.StringParameterDefinition>
+          <name>VERSION_NUM</name>
+          <description></description>
+          <defaultValue>1.0.0.0</defaultValue>
+        </hudson.model.StringParameterDefinition>
+        <hudson.model.BooleanParameterDefinition>
+          <name>DEPLOY</name>
+          <description></description>
+          <defaultValue>false</defaultValue>
+        </hudson.model.BooleanParameterDefinition>
+        <hudson.model.ChoiceParameterDefinition>
+          <name>DEPLOY_MODE</name>
+          <description></description>
+          <choices class="java.util.Arrays$ArrayList">
+            <a class="string-array">
+              <string>FULL</string>
+              <string>INCREMENTAL</string>
+            </a>
+          </choices>
+        </hudson.model.ChoiceParameterDefinition>
+        <hudson.model.BooleanParameterDefinition>
+          <name>SNAPSHOT</name>
+          <description></description>
+          <defaultValue>false</defaultValue>
+        </hudson.model.BooleanParameterDefinition>
+        <hudson.model.ChoiceParameterDefinition>
+          <name>SNAPSHOT_TYPE</name>
+          <description></description>
+          <choices class="java.util.Arrays$ArrayList">
+            <a class="string-array">
+              <string>TAG</string>
+              <string>BRANCH</string>
+            </a>
+          </choices>
+        </hudson.model.ChoiceParameterDefinition>
+        <hudson.model.StringParameterDefinition>
+          <name>SNAPSHOT_NAME</name>
+          <description></description>
+          <defaultValue></defaultValue>
+        </hudson.model.StringParameterDefinition>
+      </parameterDefinitions>
+    </hudson.model.ParametersDefinitionProperty>
+    <hudson.plugins.disk__usage.DiskUsageProperty/>
+  </properties>
+  <scm class="hudson.scm.SubversionSCM">
+    <locations>
+      <hudson.scm.SubversionSCM_-ModuleLocation>
+        <remote>http://svn.prod.server.com/svn-info/program/project/team/SampleMsgFlowProject</remote>
+      </hudson.scm.SubversionSCM_-ModuleLocation>
+      <hudson.scm.SubversionSCM_-ModuleLocation>
+        <remote>http://svn.prod.server.com/svn-info/program/project/team/BrokerBuildMaster</remote>
+      </hudson.scm.SubversionSCM_-ModuleLocation>
+    </locations>
+    <useUpdate>true</useUpdate>
+    <doRevert>false</doRevert>
+    <excludedRegions></excludedRegions>
+    <includedRegions></includedRegions>
+    <excludedUsers></excludedUsers>
+    <excludedRevprop></excludedRevprop>
+    <excludedCommitMessages></excludedCommitMessages>
+  </scm>
+  <canRoam>true</canRoam>
+  <disabled>false</disabled>
+  <blockBuildWhenUpstreamBuilding>false</blockBuildWhenUpstreamBuilding>
+  <jdk>(Default)</jdk>
+  <triggers class="vector">
+    <hudson.triggers.SCMTrigger>
+      <spec></spec>
+    </hudson.triggers.SCMTrigger>
+  </triggers>
+  <concurrentBuild>false</concurrentBuild>
+  <builders>
+    <hudson.tasks.Ant>
+      <targets></targets>
+      <antName>ant_1.8.2</antName>
+      <buildFile>./${BUILD_LOCATION}/build/Sample_Broker_Build.xml</buildFile>
+    </hudson.tasks.Ant>
+  </builders>
+  <publishers>
+    <hudson.tasks.Mailer>
+      <recipients>paul.raj@perficient.com</recipients>
+      <dontNotifyEveryUnstableBuild>false</dontNotifyEveryUnstableBuild>
+      <sendToIndividuals>false</sendToIndividuals>
+    </hudson.tasks.Mailer>
+    <hudson.plugins.emotional__hudson.EmotionalHudsonPublisher/>
+  </publishers>
+  <buildWrappers/>
+</project>

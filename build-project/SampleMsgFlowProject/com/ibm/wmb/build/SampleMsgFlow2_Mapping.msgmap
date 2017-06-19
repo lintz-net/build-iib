@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xmi:XMI xmi:version="2.0" xmlns:xmi="http://www.omg.org/XMI" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:maplang="http://www.ibm.com/wbi/2005/maplang" xmlns:msg="http://www.ibm.com/wbi/2005/msg">
+  <maplang:MapOperation name="SampleMsgFlow2_Mapping" version="7.0.100.v20100630_0750" prefixes="/0/@namespaces.0/@prefix /0/@namespaces.1/@prefix">
+    <blockContents xsi:type="msg:MsgTargetMapStatement" targetMapName="$target">
+      <blockContents xsi:type="msg:ElementMsgStatement" mappableName="Properties">
+        <blockContents xsi:type="maplang:MapFromStatement">
+          <value xsi:type="maplang:MappableReferenceExpression" name="$source" text="$source/Properties"/>
+        </blockContents>
+      </blockContents>
+      <blockContents xsi:type="msg:ElementMsgStatement" mappableName="BLOB">
+        <blockContents xsi:type="maplang:MapFromStatement">
+          <value xsi:type="maplang:MappableReferenceExpression" name="$source" text="$source/BLOB"/>
+        </blockContents>
+      </blockContents>
+    </blockContents>
+    <eParameters xsi:type="msg:MsgSourceMapRoot" name="$source" eType="/1"/>
+    <eParameters xsi:type="msg:MsgTargetMapRoot" name="$target" eType="/2"/>
+    <namespaces namespaceName="http://www.w3.org/2001/XMLSchema">
+      <prefix prefixName="xsd"/>
+    </namespaces>
+    <namespaces namespaceName="http://www.w3.org/2001/XMLSchema-instance">
+      <prefix prefixName="xsi"/>
+    </namespaces>
+  </maplang:MapOperation>
+  <msg:MessageHandle messageSetName="platform:/plugin/com.ibm.etools.mft.msg/BlobMessage.xsd" namespaceName="" simpleName="BLOB" messageKind="assembly" domainName="BLOB">
+    <headers name="Properties" rootElementName="Properties"/>
+  </msg:MessageHandle>
+  <msg:MessageHandle messageSetName="platform:/plugin/com.ibm.etools.mft.msg/BlobMessage.xsd" namespaceName="" simpleName="BLOB" messageKind="assembly" domainName="BLOB">
+    <headers name="Properties" rootElementName="Properties"/>
+  </msg:MessageHandle>
+</xmi:XMI>

@@ -1,0 +1,15 @@
+<?xml version="1.0"?>
+<project name="main.build.deploy" default="team.build.deploy">
+	<target name="team.build.deploy" description="This ant target invokes master ant which executes the broker build, override and deploy ant targets.">
+		<property environment="env" />
+		<property name="build.property.file" value="Sample_Broker_Build.properties" />
+		<property file="${build.property.file}"/>				
+		
+		<echo message="Invoking the broker master ant script file..."/>		
+		<ant antfile="${env.WORKSPACE}/BrokerBuildMaster/BrokerBuildMaster.xml" />
+		<echo message="Completed invoking the broker master ant script file."/>
+		<echo message="***********************************************************"/>
+		<echo message="*****Broker Auto Build and Deploy is Successfully Complete.*****"/>
+		<echo message="***********************************************************"/>
+	</target>
+</project>
